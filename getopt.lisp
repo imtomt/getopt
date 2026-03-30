@@ -24,27 +24,27 @@
        (char= (char str (1+ pos)) #\:)))
 
 (defun parse-getopt (argv str)
-  (let ((opts '())
-        (argc (length argv)))
-    (setf optind argc)
+  (let* ((opts '())
+        (argc (length argv))
+        (opt-index argc))
     ;; skip the first element of argv, which is the program name
     (loop with argind = 1
           while (< argind argc) do
           (let ((arg (nth argind argv)))
             ;; If we encounter "--" as an argument, ignore the rest of the args.
-            ;; optind points to the next argument.
+            ;; opt-index points to the next argument.
             (when (string= arg "--")
-              (setf optind (1+ argind))
+              (setf opt-index (1+ argind))
               (return))
 
-            ;; - also means stop, but optind points to it.
+            ;; - also means stop, but opt-index points to it.
             (when (string= arg "-")
-              (setf optind argind)
+              (setf opt-index argind)
               (return))
             
             ;; If the opt doesn't start with a -, stop parsing arguments here.
             (unless (char= (char arg 0) #\-)
-              (setf optind argind)
+              (setf opt-index argind)
               (return))
 
             ;; skip the first char, which is -
@@ -86,7 +86,7 @@
             (incf argind)))
 
     (setf opts (nreverse opts))
-    opts))
+    (values opts opt-index)))
 
 ;;
 ;; Usage:
@@ -101,18 +101,20 @@
 ;;
 (defmacro getopt (argv optstr &body clauses)
   (let ((events-var (gensym))
-        (ev-var (gensym)))
+        (ev-var (gensym))
+        (optind-var (gensym)))
     (let ((case-clauses
            (mapcar
             (lambda (clause)
               (destructuring-bind (name &body body) clause
                                   `(,name ,@body)))
             clauses)))
-      `(let ((,events-var (parse-getopt ,argv ,optstr)))
+      `(multiple-value-bind (,events-var ,optind-var)
+                            (parse-getopt ,argv ,optstr)
+         (setf getopt:optind ,optind-var)
          (dolist (,ev-var ,events-var)
            (let ((opt (car ,ev-var))
                  (optarg (cdr ,ev-var)))
              (declare (ignorable opt))
              (declare (ignorable optarg))
-             (case opt
-                   ,@case-clauses)))))))
+             (case opt ,@case-clauses)))))))
