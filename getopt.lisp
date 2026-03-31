@@ -1,4 +1,4 @@
-;;; getopt.asd - ASDF system definition for getopt
+;;; getopt.lisp -- POSIX-style getopt for Common Lisp
 ;;; Copyright (C) 2026 imtomt
 ;;;
 ;;; This program is free software: you can redistribute it and/or modify
