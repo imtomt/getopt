@@ -1,6 +1,6 @@
 (defpackage :getopt
             (:use :cl)
-            (:export :getopt :*optind* :opt :optarg))
+            (:export :getopt :*optind* :opt :optarg :optopt))
 
 (in-package :getopt)
 
@@ -25,23 +25,28 @@
   (and (< pos (1- (length str)))
        (char= (char str (1+ pos)) #\:)))
 
-;; Make the option list that parse-getopt builds. Each option is of the format:
-;; (option character . optarg, or nil if none . optind)
-;; If there was a failure, parse-getopt will set arg to either #\? or #\:. In
-;; that case, we set optarg to the error-causing argument.
-(defun make-opt (arg optarg argv-pos char-pos &optional err)
-  (list
-   ;; If an error argument was passed, set opt to the error.
-   (if err err (char arg char-pos))
-   ;; If an error argument was passed, set optarg to the original argument.
-   (if err arg optarg)
-   (if (= char-pos (1- (length arg)))
-       (1+ argv-pos)
-     argv-pos)))
+;; Make the option list that parse-getopt builds. Each option is a list of the
+;; form:
+;; (opt-character   optarg [or nil if none]   optind   optopt)
+;; If optopt is set, we assume it's a string, which it really should be. To pass
+;; an error, arg would instead be a char (#\? or #\:) and optopt would be the
+;; actual argv element.
+(defun make-opt (arg optarg argv-pos char-pos &optional optopt)
+  (let ((actual-opt (if (stringp arg)
+                        arg
+                      (if (stringp optopt)
+                          optopt))))
+    (list
+     (char actual-opt char-pos)
+     optarg
+     (if (= char-pos (1- (length actual-opt)))
+         (1+ argv-pos)
+       argv-pos)
+     (char actual-opt char-pos))))
 
 (defun try-warn (warn-p format-str &rest args)
   (when warn-p
-    (apply #'format t format-str args)))
+    (apply #'format *error-output* format-str args)))
 
 (defun parse-getopt (argv str warn-p)
   (let* ((opts '())
@@ -79,7 +84,7 @@
                   ;; in the opt string.
                   (let* ((ch (char arg char-pos))
                          (pos (unless (char= ch #\:)
-                                (position (char arg char-pos) str))))
+                                (position ch str))))
                     (if pos
                         ;; Matching option found!
                         (progn
@@ -109,11 +114,11 @@
                                       "~A: option requires an argument -- ~A~%"
                                       (aref argv 0) ch)
 
-                                    (push (make-opt arg
+                                    (push (make-opt #\:
                                                     nil
                                                     argv-pos
                                                     char-pos
-                                                    #\:)
+                                                    arg)
                                           opts))))
                             (push (make-opt arg nil argv-pos char-pos)
                                   opts)))
@@ -124,7 +129,7 @@
                         (try-warn warn-p
                                   "~A: illegal option -- ~A~%"
                                   (aref argv 0) ch)
-                        (push (make-opt arg nil argv-pos char-pos #\?)
+                        (push (make-opt #\? nil argv-pos char-pos arg)
                               opts)))))
             (incf argv-pos)))
 
@@ -165,9 +170,9 @@
                               (parse-getopt ,argv ,optstr ,warn-p)
            (setf getopt:*optind* ,optind-var)
            (dolist (,ev-var ,events-var)
-             (let ((opt (car ,ev-var))
-                   (optarg (cadr ,ev-var))
-                   (*optind* (caddr ,ev-var)))
-               (declare (ignorable opt))
-               (declare (ignorable optarg))
+             (let ((opt (first ,ev-var))
+                   (optarg (second ,ev-var))
+                   (*optind* (third ,ev-var))
+                   (optopt (fourth ,ev-var)))
+               (declare (ignorable opt optarg optopt))
                (case opt ,@case-clauses))))))))
