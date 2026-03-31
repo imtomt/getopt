@@ -11,9 +11,11 @@
 ;; If we don't consume the next element of argv, it's nil. That's -Xoptarg with
 ;; no space.
 (defun get-optarg (argv argind strind)
-  (let ((arg (nth argind argv)))
+  (let ((arg (aref argv argind)))
     (if (= strind (1- (length arg)))
-        (cons t (nth (1+ argind) argv))
+        (if (< (1+ argind) (length argv))
+            (cons t (aref argv (1+ argind)))
+          (cons t nil))
       (cons nil (subseq arg (1+ strind))))))
 
 ;; Given the getopt string, like "abc:d", and the current position within that
@@ -23,7 +25,18 @@
   (and (< pos (1- (length str)))
        (char= (char str (1+ pos)) #\:)))
 
-(defun parse-getopt (argv str)
+(defun make-opt (arg optarg argind i)
+  (list (char arg i)
+        optarg
+        (if (= i (1- (length arg)))
+            (1+ argind)
+          argind)))
+
+(defmacro try-warn (warn-p format-str &rest args)
+  `(when ,warn-p
+     (format t ,format-str ,@args)))
+
+(defun parse-getopt (argv str warn-p)
   (let* ((opts '())
          (argv (coerce argv 'vector))
          (argc (length argv))
@@ -61,29 +74,34 @@
                                 ;; or if it consumed the next element in argv
                                 (if (cdr optarg)
                                     (progn
-                                      (push (cons (char arg i)
-                                                  (cdr optarg))
-                                            opts)
                                       ;; if car optarg is t, we consumed the next
                                       ;; element of argv, so we have to skip it
                                       (when (car optarg)
                                         (incf argind))
+
+                                      (push (make-opt arg
+                                                      (cdr optarg)
+                                                      argind
+                                                      i)
+                                            opts)
                                       (return))
 
-                                  (format t "~A: option requires an argument -- ~A~%"
-                                          (aref argv 0)
-                                          (char arg i))))
-                            (push (cons (char arg i)
-                                        nil)
+                                  (try-warn warn-p
+                                   "~A: option requires an argument -- ~A~%"
+                                   (aref argv 0)
+                                   (char arg i))))
+                            (push (make-opt arg nil argind i)
                                   opts)))
                       ;; Oops, not a real option! We still push it onto opts
                       ;; so that it can be handled in the getopt call as an
                       ;; unknown option, with t or otherwise.
                       (progn
-                        (format t "~A: illegal option -- ~A~%"
-                                (aref argv 0)
-                                (char arg i))
-                        (push (cons (char arg i) nil) opts)))))
+                        (try-warn warn-p
+                                  "~A: illegal option -- ~A~%"
+                                  (aref argv 0)
+                                  (char arg i))
+                        (push (make-opt arg nil argind i)
+                              opts)))))
             (incf argind)))
 
     (setf opts (nreverse opts))
@@ -101,21 +119,25 @@
 ;; to the index of "file.txt".
 ;;
 (defmacro getopt (argv optstr &body clauses)
-  (let ((events-var (gensym))
-        (ev-var (gensym))
-        (optind-var (gensym)))
-    (let ((case-clauses
-           (mapcar
-            (lambda (clause)
-              (destructuring-bind (name &body body) clause
-                                  `(,name ,@body)))
-            clauses)))
-      `(multiple-value-bind (,events-var ,optind-var)
-                            (parse-getopt ,argv ,optstr)
-         (setf getopt:optind ,optind-var)
-         (dolist (,ev-var ,events-var)
-           (let ((opt (car ,ev-var))
-                 (optarg (cdr ,ev-var)))
-             (declare (ignorable opt))
-             (declare (ignorable optarg))
-             (case opt ,@case-clauses)))))))
+  (let ((warn-p (not (eq (car clauses) :no-warn))))
+    (when (eq (car clauses) :no-warn)
+      (pop clauses))
+    (let ((events-var (gensym))
+          (ev-var (gensym))
+          (optind-var (gensym)))
+      (let ((case-clauses
+             (mapcar
+              (lambda (clause)
+                (destructuring-bind (name &body body) clause
+                                    `(,name ,@body)))
+              clauses)))
+        `(multiple-value-bind (,events-var ,optind-var)
+                              (parse-getopt ,argv ,optstr ,warn-p)
+           (setf getopt:optind ,optind-var)
+           (dolist (,ev-var ,events-var)
+             (let ((opt (car ,ev-var))
+                   (optarg (cadr ,ev-var))
+                   (optind (cddr ,ev-var)))
+               (declare (ignorable opt))
+               (declare (ignorable optarg))
+               (case opt ,@case-clauses))))))))
