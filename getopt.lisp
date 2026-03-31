@@ -74,7 +74,12 @@
             ;; skips the first char, which is -a, and then loops over each char
             ;; and processes it as an option.
             (loop for char-pos from 1 below (length arg) do
-                  (let ((pos (position (char arg char-pos) str)))
+                  ;; -: is itself an illegal option. So only set pos, indicating
+                  ;; a valid match, if ch is not :. This shouldn't affect "ab:c"
+                  ;; in the opt string.
+                  (let* ((ch (char arg char-pos))
+                         (pos (unless (char= ch #\:)
+                                (position (char arg char-pos) str))))
                     (if pos
                         ;; Matching option found!
                         (progn
@@ -102,8 +107,8 @@
                                   (progn
                                     (try-warn warn-p
                                       "~A: option requires an argument -- ~A~%"
-                                      (aref argv 0)
-                                      (char arg char-pos))
+                                      (aref argv 0) ch)
+
                                     (push (make-opt arg
                                                     nil
                                                     argv-pos
@@ -118,8 +123,7 @@
                       (progn
                         (try-warn warn-p
                                   "~A: illegal option -- ~A~%"
-                                  (aref argv 0)
-                                  (char arg char-pos))
+                                  (aref argv 0) ch)
                         (push (make-opt arg nil argv-pos char-pos #\?)
                               opts)))))
             (incf argv-pos)))
@@ -134,9 +138,9 @@
 ;;   (#\b (do something here, utilizizng `optarg`...))
 ;;   (#\C (do something here...)))
 ;; `optarg` will be set if the current option has an argument. Otherwise, it
-;; will be nil. `getopt:*optind*` will be set to the last argument processsed, for
-;; example, if a command run as such: `./prog -a file.txt`, `*optind*` will be set
-;; to the index of "file.txt".
+;; will be nil. `getopt:*optind*` will be set to the last argument processsed,
+;; for example, if a command run as such: `./prog -a file.txt`, `*optind*` will
+;; be set to the index of "file.txt".
 ;;
 (defmacro getopt (argv optstr &body clauses)
   ;; If called with (getopt ... :no-warn, we suppress the warning messages for
