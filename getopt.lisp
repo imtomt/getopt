@@ -28,16 +28,17 @@
 ;; Make the option list that parse-getopt builds. Each option is a list of the
 ;; form:
 ;; (opt-character   optarg [or nil if none]   optind   optopt)
-;; If optopt is set, we assume it's a string, which it really should be. To pass
-;; an error, arg would instead be a char (#\? or #\:) and optopt would be the
-;; actual argv element.
+;; If arg is a character, like #\? or #\:, the actual argument string should be
+;; passed to optopt.
 (defun make-opt (arg optarg argv-pos char-pos &optional optopt)
-  (let ((actual-opt (if (stringp arg)
-                        arg
-                      (if (stringp optopt)
-                          optopt))))
+  (let ((actual-opt (cond ((stringp arg) arg)
+                          ((stringp optopt) optopt)
+                          (t
+                           (error "make-opt: neither arg nor optopt is str")))))
     (list
-     (char actual-opt char-pos)
+     (if (characterp optopt)
+         optopt
+       (char arg char-pos))
      optarg
      (if (= char-pos (1- (length actual-opt)))
          (1+ argv-pos)
@@ -114,11 +115,11 @@
                                       "~A: option requires an argument -- ~A~%"
                                       (aref argv 0) ch)
 
-                                    (push (make-opt #\:
+                                    (push (make-opt arg
                                                     nil
                                                     argv-pos
                                                     char-pos
-                                                    arg)
+                                                    #\:)
                                           opts))))
                             (push (make-opt arg nil argv-pos char-pos)
                                   opts)))
@@ -129,7 +130,7 @@
                         (try-warn warn-p
                                   "~A: illegal option -- ~A~%"
                                   (aref argv 0) ch)
-                        (push (make-opt #\? nil argv-pos char-pos arg)
+                        (push (make-opt arg nil argv-pos char-pos #\?)
                               opts)))))
             (incf argv-pos)))
 
@@ -140,10 +141,10 @@
 ;; Usage:
 ;; (getopt argv "ab:C"
 ;;   (#\a (do something here...))
-;;   (#\b (do something here, utilizizng `optarg`...))
+;;   (#\b (do something here, utilizing `optarg`...))
 ;;   (#\C (do something here...)))
 ;; `optarg` will be set if the current option has an argument. Otherwise, it
-;; will be nil. `getopt:*optind*` will be set to the last argument processsed,
+;; will be nil. `getopt:*optind*` will be set to the last argument processed,
 ;; for example, if a command run as such: `./prog -a file.txt`, `*optind*` will
 ;; be set to the index of "file.txt".
 ;;
