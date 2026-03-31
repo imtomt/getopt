@@ -1,6 +1,6 @@
 (defpackage :getopt
             (:use :cl)
-            (:export :getopt :optind))
+            (:export :getopt :optind :opt :optarg))
 
 (in-package :getopt)
 
