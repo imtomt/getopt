@@ -25,16 +25,23 @@
   (and (< pos (1- (length str)))
        (char= (char str (1+ pos)) #\:)))
 
-(defun make-opt (arg optarg argv-pos char-pos)
-  (list (char arg char-pos)
-        optarg
-        (if (= char-pos (1- (length arg)))
-            (1+ argv-pos)
-          argv-pos)))
+;; Make the option list that parse-getopt builds. Each option is of the format:
+;; (option character . optarg, or nil if none . optind)
+;; If there was a failure, parse-getopt will set arg to either #\? or #\:. In
+;; that case, we set optarg to the error-causing argument.
+(defun make-opt (arg optarg argv-pos char-pos &optional err)
+  (list
+   ;; If an error argument was passed, set opt to the error.
+   (if err err (char arg char-pos))
+   ;; If an error argument was passed, set optarg to the original argument.
+   (if err arg optarg)
+   (if (= char-pos (1- (length arg)))
+       (1+ argv-pos)
+     argv-pos)))
 
-(defmacro try-warn (warn-p format-str &rest args)
-  `(when ,warn-p
-     (format t ,format-str ,@args)))
+(defun try-warn (warn-p format-str &rest args)
+  (when warn-p
+    (apply #'format t format-str args)))
 
 (defun parse-getopt (argv str warn-p)
   (let* ((opts '())
@@ -92,10 +99,17 @@
                                             opts)
                                       (return))
 
-                                  (try-warn warn-p
-                                   "~A: option requires an argument -- ~A~%"
-                                   (aref argv 0)
-                                   (char arg char-pos))))
+                                  (progn
+                                    (try-warn warn-p
+                                      "~A: option requires an argument -- ~A~%"
+                                      (aref argv 0)
+                                      (char arg char-pos))
+                                    (push (make-opt arg
+                                                    nil
+                                                    argv-pos
+                                                    char-pos
+                                                    #\:)
+                                          opts))))
                             (push (make-opt arg nil argv-pos char-pos)
                                   opts)))
                       ;; Oops, not a real option! We still push it onto opts
@@ -106,7 +120,7 @@
                                   "~A: illegal option -- ~A~%"
                                   (aref argv 0)
                                   (char arg char-pos))
-                        (push (make-opt arg nil argv-pos char-pos)
+                        (push (make-opt arg nil argv-pos char-pos #\?)
                               opts)))))
             (incf argv-pos)))
 
@@ -149,7 +163,7 @@
            (dolist (,ev-var ,events-var)
              (let ((opt (car ,ev-var))
                    (optarg (cadr ,ev-var))
-                   (*optind* (cddr ,ev-var)))
+                   (*optind* (caddr ,ev-var)))
                (declare (ignorable opt))
                (declare (ignorable optarg))
                (case opt ,@case-clauses))))))))
