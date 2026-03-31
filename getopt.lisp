@@ -25,12 +25,13 @@
 
 (defun parse-getopt (argv str)
   (let* ((opts '())
-        (argc (length argv))
-        (opt-index argc))
+         (argv (coerce argv 'vector))
+         (argc (length argv))
+         (opt-index argc))
     ;; skip the first element of argv, which is the program name
     (loop with argind = 1
           while (< argind argc) do
-          (let ((arg (nth argind argv)))
+          (let ((arg (aref argv argind)))
             ;; If we encounter "--" as an argument, ignore the rest of the args.
             ;; opt-index points to the next argument.
             (when (string= arg "--")
@@ -70,7 +71,7 @@
                                       (return))
 
                                   (format t "~A: option requires an argument -- ~A~%"
-                                          (car argv)
+                                          (aref argv 0)
                                           (char arg i))))
                             (push (cons (char arg i)
                                         nil)
@@ -80,7 +81,7 @@
                       ;; unknown option, with t or otherwise.
                       (progn
                         (format t "~A: illegal option -- ~A~%"
-                                (car argv)
+                                (aref argv 0)
                                 (char arg i))
                         (push (cons (char arg i) nil) opts)))))
             (incf argind)))
