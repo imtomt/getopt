@@ -43,9 +43,13 @@ You can also handle unknown options, or missing arguments with `#\?` and `#\:`, 
     (format t "Oops, ~A needs an argument!~%" getopt:optopt)))
 ```
 If you don't want `getopt` to print its own warning messages, like `"./prog: illegal option -- z`, you can use the `:no-warn` keyword after the optstring:
-`(getopt argv "abc" :no-warn ...)`
+```cl
+(getopt argv "abc" :no-warn ...)
+```
 and then all warning messages will be silenced. You can also use a leading `:` in the optstring to achieve the same effect:
-`(getopt argv ":abc" ...)`
+```cl
+(getopt argv ":abc" ...)
+```
 
 You can also use `t` or `otherwise` as a catch-all for unhandled options:
 ```cl
