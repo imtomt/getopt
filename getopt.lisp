@@ -71,6 +71,10 @@
                  (coerce argv 'vector)))
          (argc (length argv))
          (opt-index argc))
+
+    (when (eq (char str 0) #\:)
+      (setf warn-p nil))
+
     ;; skip the first element of argv, which is the program name
     (loop with argv-pos = 1
           while (< argv-pos argc) do
