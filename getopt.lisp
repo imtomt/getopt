@@ -55,6 +55,8 @@
          optopt
        (char arg char-pos))
      optarg
+     ;; If we're the last option in the string, optind should point to the next
+     ;; option.
      (if (= char-pos (1- (length actual-opt)))
          (1+ argv-pos)
        argv-pos)
@@ -96,7 +98,7 @@
               (return))
 
             ;; This loop handles multiple-character opt strings. So, -abcd. This
-            ;; skips the first char, which is -a, and then loops over each char
+            ;; skips the first char, which is '-', and then loops over each char
             ;; and processes it as an option.
             (loop for char-pos from 1 below (length arg) do
                   ;; -: is itself an illegal option. So only set pos, indicating
