@@ -122,12 +122,12 @@ You can use this with `asdf`. Put `getopt.lisp` and `getopt.asd` in your ASDF so
 (asdf:load-system "getopt")
 ```
 Or, if you want to use `(getopt ...)` instead of `(getopt:getopt ...)`, you can add this, too:
-```
+```cl
 (import 'getopt:getopt)
 ```
 
 Here is a full, real example of `getopt` in use:
-```
+```cl
 (require "asdf")
 (asdf:load-system "getopt")
 (import 'getopt:getopt)
