@@ -28,7 +28,7 @@ That command line could be parsed with the following macro call:
    ((#\y #\u #\v)
      (do-more-stuff getopt:opt))
    ((#\d #\f #\z #\w)
- (do-more-stuff-2.0 getopt:opt getopt:optarg))))
+     (do-more-stuff-2.0 getopt:opt getopt:optarg))))
 ```
 The macro expands to a `cond`, so you can match multiple arguments in one conditional by matching a list.
 
@@ -124,4 +124,52 @@ You can use this with `asdf`. Put `getopt.lisp` and `getopt.asd` in your ASDF so
 Or, if you want to use `(getopt ...)` instead of `(getopt:getopt ...)`, you can add this, too:
 ```
 (import 'getopt:getopt)
-````
+```
+
+Here is a full, real example of `getopt` in use:
+```
+(require "asdf")
+(asdf:load-system "getopt")
+(import 'getopt:getopt)
+
+(defun number-p (num)
+  (not (null (parse-integer num :junk-allowed t))))
+
+(defun usage (name)
+  (format *error-output* "Usage: ~A [-dq] [-c count] [-s size] host~%" name))
+
+(let* ((argv sb-ext:*posix-argv*)
+       (size 56) (pcount 8)
+       (debug nil) (quiet nil))
+  (getopt argv "s:c:dq"
+    (#\s
+      (unless (number-p getopt:optarg)
+        (format *error-output* "invalid packet size: ~A~%" getopt:optarg)
+        (sb-ext:exit :code 1))
+      (setf size (parse-integer getopt:optarg)))
+
+    (#\c
+      (unless (and (number-p getopt:optarg)
+                   (> (parse-integer getopt:optarg) 0))
+        (format *error-output* "invalid packet count: ~A" getopt:optarg))
+      (setf pcount (parse-integer getopt:optarg)))
+
+    (#\d
+      (setf debug t))
+
+    (#\q
+      (setf quiet t))
+
+    (otherwise
+      (usage (first argv))
+      (sb-ext:exit :code 1)))
+
+  (when (= (- (length argv) getopt:*optind*)
+           0)
+    (format *error-output* "Expected host.~%")
+    (usage (first argv))
+    (sb-ext:exit :code 1))
+
+  (format t "Host: ~A Size: ~A Count: ~A Debug: ~A Quiet: ~A Optind: ~A~%"
+          (nth getopt:*optind* argv) size pcount debug quiet getopt:*optind*))
+```
